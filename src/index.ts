@@ -1,34 +1,38 @@
-import { MathExtension } from "./extensions/Math";
 import { Interpreter } from "./core/interpreter";
 import { Lexer } from "./core/lexer";
 import { Parser } from "./core/parser";
 
-const code = `
-var pessoa = {
-  nome: "Vitor"
-};
+import fs from "fs";
 
-print(pessoa.nome);
-`;
+import InputExtension from "./extensions/InputExtension";
+import UtilsExtension from "./extensions/Utils";
+import MathExtension from "./extensions/Math";
+import DateExtension from "./extensions/Date";
+import HttpExtension from "./extensions/Http";
+
+// Lê o código do arquivo
+const code = fs.readFileSync("src/test/script.vl", "utf-8");
 
 const lexer = new Lexer(code);
 const tokens = lexer.tokenize();
 
-console.log(tokens);
+//console.log(tokens);
 
 const parser = new Parser(tokens);
 const ast = parser.parse();
 
-console.log("AST:", JSON.stringify(ast, null, 2));
+//console.log("AST:", JSON.stringify(ast, null, 2));
 
 const interpreter = new Interpreter(ast);
 
 interpreter.registerExentension(new MathExtension());
+interpreter.registerExentension(new InputExtension());
+interpreter.registerExentension(new UtilsExtension());
+interpreter.registerExentension(new DateExtension());
+interpreter.registerExentension(new HttpExtension());
 
-// Adicionando a função 'print' no escopo global
-interpreter["globalScope"].define("print", (message: any) => {
-  console.log(message);
-});
-
-// Executa o código
-interpreter.run();
+try {
+  interpreter.run();
+} catch (error) {
+  console.log(error);
+}

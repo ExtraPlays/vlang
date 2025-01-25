@@ -1,7 +1,7 @@
 import { IExtension } from "../interfaces/IExtension";
 import { Scope } from "../core/scope";
 
-export class MathExtension implements IExtension {
+class MathExtension implements IExtension {
   registerExtension(scope: Scope): void {
     scope.define("sum", this.sum);
     scope.define("sub", this.sub);
@@ -15,3 +15,5 @@ export class MathExtension implements IExtension {
   randomBetween = (min: number, max: number) =>
     Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+export default MathExtension;

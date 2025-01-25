@@ -15,7 +15,19 @@ export interface Token {
   column: number;
 }
 
-const KEYWORDS = ["var", "val", "fun", "if", "else", "while", "for", "return"];
+const KEYWORDS = [
+  "var",
+  "val",
+  "fun",
+  "function",
+  "if",
+  "else",
+  "while",
+  "for",
+  "return",
+  "async",
+  "await",
+];
 const OPERATORS = [
   "=",
   "+",
@@ -128,7 +140,33 @@ export class Lexer {
     const tokens: Token[] = [];
     while (this.position < this.source.length) {
       this.skipWhitespace();
+
       const char = this.peek();
+
+      if (char === "/" && this.source[this.position + 1] === "/") {
+        // Comentário de linha
+        while (this.peek() !== "\n") {
+          this.advance();
+        }
+        continue;
+      }
+
+      if (char === "/" && this.source[this.position + 1] === "*") {
+        this.advance(); // Consome o '/'
+        this.advance(); // Consome o '*'
+        while (
+          !(this.peek() === "*" && this.source[this.position + 1] === "/") &&
+          this.peek() !== null
+        ) {
+          // Avança até encontrar '*/' ou o final da entrada
+          this.advance();
+        }
+        if (this.peek() === "*" && this.source[this.position + 1] === "/") {
+          this.advance(); // Consome '*'
+          this.advance(); // Consome '/'
+        }
+        continue;
+      }
 
       if (!char) break;
 

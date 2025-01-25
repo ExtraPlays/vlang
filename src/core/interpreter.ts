@@ -51,12 +51,26 @@ export class Interpreter {
 
       case "BinaryExpression":
         return this.evaluateBinaryExpression(node, scope);
+      case "AssignmentExpression": {
+        const variableName = node.left.name;
 
+        if (scope.isConstant(variableName)) {
+          throw new Error(`Cannot assign to constant '${variableName}'`);
+        }
+
+        const value = this.evaluate(node.right, scope);
+        scope.assign(variableName, value);
+
+        return value;
+      }
       case "Literal":
         return node.value;
 
       case "Identifier":
         return scope.get(node.name);
+      case "AwaitExpression":
+        const promisse = this.evaluate(node.argument, scope);
+        return promisse.then((value: any) => value);
 
       default:
         throw new Error(`Unknown AST node type: ${node.type}`);
@@ -70,8 +84,30 @@ export class Interpreter {
   }
 
   private evaluateVariableDeclaration(node: ASTNode, scope: Scope) {
-    const value = this.evaluate(node.value, scope);
-    scope.define(node.identifier, value);
+    const { identifier, value, isConst } = node;
+
+    // Avalia o valor da expressão
+    const evaluatedValue = this.evaluate(value, scope);
+
+    // Tenta definir no escopo
+    try {
+      scope.define(identifier, evaluatedValue, isConst);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(
+          `Error defining variable '${identifier}': ${error.message}`
+        );
+      } else {
+        throw new Error(
+          `Error defining variable '${identifier}': ${String(error)}`
+        );
+      }
+    }
+
+    return evaluatedValue;
+
+    // const value = this.evaluate(node.value, scope);
+    // scope.define(node.identifier, value);
   }
 
   private evaluateFunctionDeclaration(node: ASTNode, scope: Scope) {

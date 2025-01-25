@@ -60,10 +60,8 @@ export class Parser {
 
     if (token.type === TokenType.Keyword) {
       if (token.value === "var" || token.value === "val") {
-        const statement = this.parseVariableDeclaration();
-        this.expect(TokenType.Operator, ";"); // Consome o ';'
-        return statement;
-      } else if (token.value === "fun") {
+        return this.parseVariableDeclaration();
+      } else if (token.value === "fun" || token.value === "function") {
         return this.parseFunctionDeclaration();
       } else if (token.value === "if") {
         return this.parseIfStatement();
@@ -72,10 +70,46 @@ export class Parser {
       }
     }
 
-    // Caso nenhuma palavra-chave seja encontrada, trata como uma expressão genérica
-    const expression = this.parseExpression();
-    this.expect(TokenType.Operator, ";"); // Consome o ';'
-    return { type: "ExpressionStatement", expression };
+    // Se for um identificador, trata como uma expressão
+    if (token.type === TokenType.Identifier) {
+      return this.parseExpressionStatement();
+    }
+
+    throw new Error(
+      `Unexpected token: '${token.value}' at ${token.line}:${token.column}`
+    );
+  }
+
+  private parseExpressionStatement(): ASTNode {
+    const left = this.parseExpression();
+
+    // Verifica se é uma atribuição
+    if (
+      left.type === "Identifier" &&
+      this.peek().type === TokenType.Operator &&
+      this.peek().value === "="
+    ) {
+      this.consume(); // Consome o operador '='
+      const right = this.parseExpression();
+
+      // Verifica e consome o ponto e vírgula
+      this.expect(TokenType.Operator, ";");
+
+      return {
+        type: "AssignmentExpression",
+        operator: "=",
+        left,
+        right,
+      };
+    }
+
+    // Se não for uma atribuição, verifica se termina com ';'
+    this.expect(TokenType.Operator, ";");
+
+    return {
+      type: "ExpressionStatement",
+      expression: left,
+    };
   }
 
   private parseVariableDeclaration(): ASTNode {
@@ -88,18 +122,12 @@ export class Parser {
       type = this.expect(TokenType.Identifier).value;
     }
 
+    // Verifica e consome o '='
+    this.expect(TokenType.Operator, "=");
     const value = this.parseExpression();
 
-    // Verifica se há ';' após a declaração
-    if (this.peek().type !== TokenType.Operator || this.peek().value !== ";") {
-      throw new Error(
-        `Missing ';' after variable declaration '${identifier}' at ${
-          this.peek().line
-        }:${this.peek().column}`
-      );
-    }
-
-    this.expect(TokenType.Operator); // Consume '='
+    // Verifica e consome o ';'
+    this.expect(TokenType.Operator, ";");
 
     return {
       type: "VariableDeclaration",
@@ -190,7 +218,7 @@ export class Parser {
   private parseExpression(): ASTNode {
     let left = this.parsePrimaryExpression();
 
-    // Verifica operadores binários (ex.: +, -, *, /)
+    // Trata operadores binários (ex.: +, -, *, /)
     while (
       this.peek().type === TokenType.Operator &&
       ["+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!="].includes(
@@ -207,8 +235,11 @@ export class Parser {
       };
     }
 
-    // Verifica chamadas de função
-    if (this.peek().type === TokenType.Operator && this.peek().value === "(") {
+    // Trata chamadas de função
+    while (
+      this.peek().type === TokenType.Operator &&
+      this.peek().value === "("
+    ) {
       this.consume(); // Consome '('
       const args: ASTNode[] = [];
       while (
@@ -222,31 +253,36 @@ export class Parser {
       }
       this.consume(); // Consome ')'
 
-      return {
+      left = {
         type: "CallExpression",
         callee: left,
         arguments: args,
       };
     }
 
-    // Verifica acesso por índice (ex.: numeros[0])
+    // Trata acessos por índice ou propriedades (ex.: pessoa.nome, numeros[0])
     while (
       this.peek().type === TokenType.Operator &&
-      this.peek().value === "["
+      (this.peek().value === "." || this.peek().value === "[")
     ) {
-      this.consume(); // Consome '['
-      const index = this.parseExpression(); // Analisa a expressão do índice
-      this.expect(TokenType.Operator, "]"); // Consome ']'
-      left = {
-        type: "MemberExpression",
-        object: left, // O array ou objeto que está sendo acessado
-        property: index, // O índice ou chave
-      };
-    }
+      const operator = this.consume().value;
 
-    // Verifica se é um objeto
-    if (this.peek().type === TokenType.Operator && this.peek().value === "{") {
-      return this.parseObjectExpression();
+      if (operator === ".") {
+        const property = this.expect(TokenType.Identifier).value;
+        left = {
+          type: "MemberExpression",
+          object: left, // O objeto sendo acessado
+          property: { type: "Literal", value: property }, // A propriedade sendo acessada
+        };
+      } else if (operator === "[") {
+        const index = this.parseExpression(); // Analisa o índice
+        this.expect(TokenType.Operator, "]"); // Consome ']'
+        left = {
+          type: "MemberExpression",
+          object: left, // O array ou objeto sendo acessado
+          property: index, // O índice
+        };
+      }
     }
 
     return left;
